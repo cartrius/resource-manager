@@ -1,0 +1,9 @@
+[package]
+name = "resource-manager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.27"
+tui = "0.19"
+sysinfo = "0.29"
