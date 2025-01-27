@@ -1,14 +1,23 @@
 use sysinfo::{System, Disks};
+use system::render_memory_stats;
 mod system;
 use crate::system::render_sys_stats;
+use crate::system::render_cpu_stats;
+use crate::system::render_disk_stats;
 
 fn main() {
     let mut sys = System::new_all();
+    let disks = Disks::new_with_refreshed_list();
     
     // Update all the information in the System struct
     sys.refresh_all();
 
     render_sys_stats();
+    render_cpu_stats(&sys);
+    render_memory_stats(&sys);
+    render_disk_stats(&disks);
+    // let mut usage = get_cpu_usage(&sys);
+    // println!("CPU Usage: {}%", usage)
 
 //     println!("=> system:");
 // // RAM and swap information:
