@@ -1,9 +1,11 @@
 use sysinfo::{System, Disks};
 use system::render_memory_stats;
 mod system;
+mod processes;
 use crate::system::render_sys_stats;
 use crate::system::render_cpu_stats;
 use crate::system::render_disk_stats;
+use crate::processes::add_processes;
 
 fn main() {
     let mut sys = System::new_all();
@@ -16,6 +18,7 @@ fn main() {
     render_cpu_stats(&sys);
     render_memory_stats(&sys);
     render_disk_stats(&disks);
+    add_processes(&sys);
     // let mut usage = get_cpu_usage(&sys);
     // println!("CPU Usage: {}%", usage)
 
