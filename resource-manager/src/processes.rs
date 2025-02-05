@@ -23,6 +23,8 @@ pub fn add_processes(sys: &System) {
         println!("Memory: {:?}", memory); 
         println!("CPU: {:?}", cpu); 
         println!("Uptime: {:?}", uptime); 
+        println!("EUID: {:?}", euid.unwrap());
+        println!("EGID: {:?}", egid.unwrap());
         //println!("EUID/EGID: {:?}/{:?}", euid.unwrap(), egid.unwrap()); 
     }
     
