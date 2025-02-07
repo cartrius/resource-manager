@@ -1,14 +1,28 @@
+use std::io;
 use sysinfo::{System, Disks};
-use system::render_memory_stats;
+use tui::{
+    backend::CrosstermBackend,
+    widgets::{Widget, Block, Borders},
+    layout::{Layout, Constraint, Direction},
+    Terminal
+};
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+// use system::render_memory_stats;
 mod system;
 mod processes;
-use crate::system::render_sys_stats;
-use crate::system::render_cpu_stats;
-use crate::system::render_disk_stats;
-use crate::processes::add_processes;
+mod ui;
+use crate::ui::generate_terminal;
+// use crate::system::render_sys_stats;
+// use crate::system::render_cpu_stats;
+// use crate::system::render_disk_stats;
+// use crate::processes::add_processes;
 use crate::system::collect_system_stats;
 use crate::system::print_stats;
-use crate::processes::collect_processes;
+// use crate::processes::collect_processes;
 use crate::processes::print_processes;
 
 fn main() {
@@ -18,67 +32,24 @@ fn main() {
     // Update all the information in the System struct
     sys.refresh_all();
 
-    // render_sys_stats();
-    // render_cpu_stats(&sys);
-    // render_memory_stats(&sys);
-    // render_disk_stats(&disks);
-    // add_processes(&sys);
     println!("-------");
 
-    let stats = collect_system_stats(&mut sys);
-    print_stats(&stats);
-    println!("PRINTING PROCCESES");
-    print_processes(&sys);
-    // let mut usage = get_cpu_usage(&sys);
-    // println!("CPU Usage: {}%", usage)
+    // let stats = collect_system_stats(&mut sys);
+    // print_stats(&stats);
+    // println!("PRINTING PROCCESES");
+    // print_processes(&sys);
 
-//     println!("=> system:");
-// // RAM and swap information:
-// println!("total memory: {} bytes", sys.total_memory());
-// println!("used memory : {} bytes", sys.used_memory());
-// println!("total swap  : {} bytes", sys.total_swap());
-// println!("used swap   : {} bytes", sys.used_swap());
+    // let stdout = io::stdout();
+    // let backend = CrosstermBackend::new(stdout);
+    // let mut terminal = Terminal::new(backend);
 
-// // Display system information:
-// println!("System name:             {:?}", System::name());
-// println!("System kernel version:   {:?}", System::kernel_version());
-// println!("System OS version:       {:?}", System::os_version());
-// println!("System host name:        {:?}", System::host_name());
-
-// // Number of CPUs:
-// println!("NB CPUs: {}", sys.cpus().len());
-
-// // Display processes ID, name na disk usage:
-// for (pid, process) in sys.processes() {
-//     println!("[{pid}] {:?} {:?}", process.name(), process.disk_usage());
-// }
-
-// // We display all disks' information:
-// println!("=> disks:");
-// let disks = Disks::new_with_refreshed_list();
-// for disk in &disks {
-//     println!("{disk:?}");
-// }
-
-// // Network interfaces name, total data received and total data transmitted:
-// let networks = Networks::new_with_refreshed_list();
-// println!("=> networks:");
-// for (interface_name, data) in &networks {
-//     println!(
-//         "{interface_name}: {} B (down) / {} B (up)",
-//         data.total_received(),
-//         data.total_transmitted(),
-//     );
-//     // If you want the amount of data received/transmitted since last call
-//     // to `Networks::refresh`, use `received`/`transmitted`.
-// }
-
-// // Components temperature:
-// let components = Components::new_with_refreshed_list();
-// println!("=> components:");
-// for component in &components {
-//     println!("{component:?}");
-// }
-
+    // terminal.expect("REASON").draw(|f| {
+    //     let size = f.size();
+    //     let block = Block::default()
+    //         .title("Block")
+    //         .borders(Borders::ALL);
+    //     f.render_widget(block, size);
+    // });
+    generate_terminal();
 
 }
