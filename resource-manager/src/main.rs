@@ -6,6 +6,8 @@ use crate::system::render_sys_stats;
 use crate::system::render_cpu_stats;
 use crate::system::render_disk_stats;
 use crate::processes::add_processes;
+use crate::system::collect_system_stats;
+use crate::system::print_stats;
 
 fn main() {
     let mut sys = System::new_all();
@@ -14,11 +16,15 @@ fn main() {
     // Update all the information in the System struct
     sys.refresh_all();
 
-    render_sys_stats();
-    render_cpu_stats(&sys);
-    render_memory_stats(&sys);
-    render_disk_stats(&disks);
-    add_processes(&sys);
+    // render_sys_stats();
+    // render_cpu_stats(&sys);
+    // render_memory_stats(&sys);
+    // render_disk_stats(&disks);
+    // add_processes(&sys);
+    println!("-------");
+
+    let stats = collect_system_stats(&mut sys);
+    print_stats(&stats);
     // let mut usage = get_cpu_usage(&sys);
     // println!("CPU Usage: {}%", usage)
 
