@@ -8,6 +8,8 @@ use crate::system::render_disk_stats;
 use crate::processes::add_processes;
 use crate::system::collect_system_stats;
 use crate::system::print_stats;
+use crate::processes::collect_processes;
+use crate::processes::print_processes;
 
 fn main() {
     let mut sys = System::new_all();
@@ -25,6 +27,8 @@ fn main() {
 
     let stats = collect_system_stats(&mut sys);
     print_stats(&stats);
+    println!("PRINTING PROCCESES");
+    print_processes(&sys);
     // let mut usage = get_cpu_usage(&sys);
     // println!("CPU Usage: {}%", usage)
 
