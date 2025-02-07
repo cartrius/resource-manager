@@ -11,6 +11,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use ui::test_render_cpu_stats;
 // use system::render_memory_stats;
 mod system;
 mod processes;
@@ -34,22 +35,7 @@ fn main() {
 
     println!("-------");
 
-    // let stats = collect_system_stats(&mut sys);
-    // print_stats(&stats);
-    // println!("PRINTING PROCCESES");
-    // print_processes(&sys);
-
-    // let stdout = io::stdout();
-    // let backend = CrosstermBackend::new(stdout);
-    // let mut terminal = Terminal::new(backend);
-
-    // terminal.expect("REASON").draw(|f| {
-    //     let size = f.size();
-    //     let block = Block::default()
-    //         .title("Block")
-    //         .borders(Borders::ALL);
-    //     f.render_widget(block, size);
-    // });
     generate_terminal();
+    test_render_cpu_stats();
 
 }
