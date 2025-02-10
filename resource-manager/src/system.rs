@@ -56,6 +56,7 @@ pub fn print_stats(stats: &SystemStats) {
     println!("Free memory: {}", stats.free_memory);
 }
 
+// Move in refactor later
 pub fn render_cpu_stats<B: Backend>(f: &mut Frame<B>, sys: &mut System, chunk: Rect) {
     let cpu_stats = collect_system_stats(sys);
     let cpu_chunk = Layout::default()

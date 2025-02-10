@@ -1,89 +1,125 @@
 use std::{
     io::{self, Result},
-    time,
+    thread,
+    time::Duration,
 };
-use std::{thread, time::Duration};
-use tui::{
-    backend::CrosstermBackend,
-    widgets::{Widget, Block, Borders},
-    layout::{Layout, Constraint, Direction},
-    Terminal
-};
-use sysinfo::{System};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use tui::{
+    backend::{Backend, CrosstermBackend},
+    layout::{Layout, Constraint, Direction, Rect},
+    widgets::{Block, Borders},
+    Frame, Terminal,
+};
+use sysinfo::System;
 
-use crate::system::render_cpu_stats;
+use crate::system::{SystemStats, collect_system_stats};
+use crate::processes::{ProcessInfo, collect_processes};
 
-pub fn test_render_cpu_stats() -> Result<()> {
-    // 1) Setup terminal
+
+pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, processes: &[ProcessInfo]) {
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(40),
+            Constraint::Percentage(60),
+        ].as_ref())
+        .split(f.size());
+
+    let stats_area = main_chunks[0];
+    let processes_area = main_chunks[1];
+
+    let stats_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(7), // CPU
+                Constraint::Length(7), // Memory
+                Constraint::Length(7), // Disk - maybe System chunk too?
+            ].as_ref())
+            .split(stats_area);
+
+    // Draw chunks within respective chunks
+    draw_cpu_section(f, stats, stats_chunks[0]);
+    draw_memory_section(f, stats, stats_chunks[1]);
+    draw_disk_section(f, stats, stats_chunks[2]);
+    draw_processes_section(f, processes, processes_area);
+}
+
+fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
+    let block = Block::default()
+        .title("CPU Stats")
+        .borders(Borders::ALL);
+
+    f.render_widget(block, area);
+}
+
+fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
+    let block = Block::default()
+        .title("Memory Stats")
+        .borders(Borders::ALL);
+
+    f.render_widget(block, area);
+}
+
+fn draw_disk_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
+    let block = Block::default()
+    .title("Disk Stats")
+    .borders(Borders::ALL);
+
+    f.render_widget(block, area);
+}
+
+fn draw_processes_section<B: Backend>(f: &mut Frame<B>, processes: &[ProcessInfo], area: Rect) {
+    let block = Block::default().title("Processes").borders(Borders::ALL);
+    f.render_widget(block, area);
+
+    // let inner_area = block.inner(area);
+    // Maybe use a Table or Paragraph to show info
+    // let table = Table::new(...)
+    // f.render_widget(table, inner_area);
+}
+
+
+pub fn run_terminal_ui() -> Result<()> {
+    // 1) Setup terminal in raw mode
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
-    // 2) Create a System to pass in
     let mut sys = System::new_all();
-    sys.refresh_all(); // Just to ensure we have fresh CPU usage data
 
-    // 3) Draw once
-    terminal.draw(|frame| {
-        let size = frame.size();
-        // Call your function to render CPU stats in the entire terminal area
-        render_cpu_stats(frame, &mut sys, size);
-    })?;
+    loop {
+        // Refresh data
+        sys.refresh_all();
+        // Collect stats and processes
+        let stats = collect_system_stats(&mut sys);
+        let processes = collect_processes(&sys);
 
-    // 4) Pause for a few seconds so you can see it
-    thread::sleep(Duration::from_secs(5));
+        // Draw terminal
+        terminal.draw(|frame| {
+            draw_ui(frame, &stats, &processes);
+        })?;
 
-    // 5) Exit
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-    terminal.show_cursor()?;
+        // Check if user pressed 'q' to quit
+        if crossterm::event::poll(Duration::from_millis(200))? {
+            if let Event::Key(key_event) = event::read()? {
+                if key_event.code == KeyCode::Char('q') {
+                    break;
+                }
+            }
+        }
+    }
 
-    Ok(())
-}
-
-pub fn generate_terminal() -> Result<()> {
-    
-
-    enable_raw_mode()?;
-   let mut stdout = io::stdout();
-   execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    terminal.draw(|f| {
-        let chunks = Layout::default()
-         .direction(Direction::Horizontal)
-         .margin(1)
-         .constraints(
-             [
-                 Constraint::Percentage(40),
-                 Constraint::Percentage(60),
-             ].as_ref()
-         )
-         .split(f.size());
-     let block = Block::default()
-          .title("Stats")
-          .borders(Borders::ALL);
-     f.render_widget(block, chunks[0]);
-     let block = Block::default()
-          .title("Processes")
-          .borders(Borders::ALL);
-     f.render_widget(block, chunks[1]);
-    })?; 
-
-    thread::sleep(Duration::from_millis(5000));
+    // Cleanup
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        DisableMouseCapture,
+        DisableMouseCapture
     )?;
     terminal.show_cursor()?;
     Ok(())
