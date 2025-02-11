@@ -27,7 +27,7 @@ pub fn render_label_value<B: Backend>(f: &mut Frame<B>, label: &str, value: Stri
         .alignment(Alignment::Left);
     let value_paragraph = Paragraph::new(Span::styled(value, Style::default()))
         .block(Block::default().borders(Borders::NONE))
-        .alignment(Alignment::Left);
+        .alignment(Alignment::Right);
     f.render_widget(label_paragraph, label_chunk);
     f.render_widget(value_paragraph, value_chunk);
 }
