@@ -10,8 +10,10 @@ use crossterm::{
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Layout, Constraint, Direction, Rect},
-    widgets::{Block, Borders},
+    layout::{Alignment, Layout, Constraint, Direction, Rect},
+    text::Span,
+    style::Style,
+    widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
 use sysinfo::System;
@@ -19,6 +21,16 @@ use sysinfo::System;
 use crate::system::{collect_system_stats, render_cpu_stats, SystemStats};
 use crate::processes::{ProcessInfo, collect_processes};
 
+pub fn render_label_value<B: Backend>(f: &mut Frame<B>, label: &str, value: String, label_chunk: Rect, value_chunk: Rect) {
+    let label_paragraph = Paragraph::new(Span::styled(label, Style::default()))
+        .block(Block::default().borders(Borders::NONE))
+        .alignment(Alignment::Left);
+    let value_paragraph = Paragraph::new(Span::styled(value, Style::default()))
+        .block(Block::default().borders(Borders::NONE))
+        .alignment(Alignment::Left);
+    f.render_widget(label_paragraph, label_chunk);
+    f.render_widget(value_paragraph, value_chunk);
+}
 
 pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, processes: &[ProcessInfo]) {
     // Main terminal frame
@@ -156,7 +168,11 @@ fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
         ])
         .split(mem_sub_chunks[1]);
 
-    //render_label_value(label, value, mem_label_subchunks[0], mem_num_subchunks[0]);
+    let avail_mem = stats.total_memory - stats.used_memory;
+    render_label_value(f, "Total Memory: ", stats.total_memory.to_string(), mem_label_subchunks[2], mem_num_subchunks[2]);
+    render_label_value(f, "Avail Memory: ", avail_mem.to_string(), mem_label_subchunks[3], mem_num_subchunks[3]);
+    render_label_value(f, "Used Memory: ", stats.used_memory.to_string(), mem_label_subchunks[4], mem_num_subchunks[4]);
+    render_label_value(f, "Free Memory: ", stats.free_memory.to_string(), mem_label_subchunks[5], mem_num_subchunks[5]);
 }
 
 fn draw_disk_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
@@ -206,10 +222,10 @@ pub fn run_terminal_ui() -> Result<()> {
             draw_ui(frame, &stats, &processes);
         })?;
 
-        // Check if user pressed 'q' to quit
+        // Check if user pressed 'q' or `ESC` to quit
         if crossterm::event::poll(Duration::from_millis(200))? {
             if let Event::Key(key_event) = event::read()? {
-                if key_event.code == KeyCode::Char('q') {
+                if key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Esc {
                     break;
                 }
             }
