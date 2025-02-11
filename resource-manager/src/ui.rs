@@ -125,10 +125,6 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
         render_label_value(f, &cpu_name, stats.cpu_cores[i].to_string(), indiv_cpus_label_chunk[i], indiv_cpus_value_chunk[i]);
     }
 
-    
-
-    
-
 }
 
 fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {

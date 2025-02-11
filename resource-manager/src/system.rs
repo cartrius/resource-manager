@@ -7,6 +7,7 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
+use std::ffi::OsStr;
 
 pub struct SystemStats {
     pub host_name: Option<String>,
@@ -22,6 +23,47 @@ pub struct SystemStats {
     pub free_memory: u64,
 }
 
+pub struct DisksStats {
+    pub disk_names: Vec<String>,
+    pub disk_mnt_pts: Vec<String>,
+    pub disk_usages: Vec<String>,
+    pub disk_filesystems: Vec<String>,
+    pub disk_kinds: Vec<String>,
+}
+
+pub fn collect_disks_stats() -> DisksStats {
+    let disks = Disks::new_with_refreshed_list();
+    let disk_list = disks.list();
+    let disk_names = disk_list
+            .iter()
+            .map(|disk| disk.name().to_string_lossy().to_string())
+            .collect::<Vec<String>>();
+    let disk_mnts = disk_list
+        .iter()
+        .map(|disk| disk.mount_point().to_string_lossy().to_string())
+        .collect::<Vec<String>>();
+    let disk_usgs: Vec<String> = disk_list
+        .iter()
+        .map(|disk| format!("{:?}", disk.usage()))
+        .collect::<Vec<String>>();
+    let disk_systems = disk_list
+        .iter()
+        .map(|disk| disk.file_system().to_string_lossy().to_string())
+        .collect::<Vec<String>>();
+    let disk_kinds = disk_list
+        .iter()
+        .map(|disk| disk.kind().to_string())
+        .collect::<Vec<String>>();
+
+    DisksStats {
+        disk_names: disk_names,
+        disk_mnt_pts: disk_mnts,
+        disk_usages: disk_usgs,
+        disk_filesystems: disk_systems,
+        disk_kinds: disk_kinds,
+    }
+}
+
 pub fn collect_system_stats(sys: &mut System) -> SystemStats {
     sys.refresh_all();
     let cpu_names = sys
@@ -34,6 +76,8 @@ pub fn collect_system_stats(sys: &mut System) -> SystemStats {
             .iter()
             .map(|cpu| cpu.cpu_usage())
             .collect::<Vec<f32>>();
+    let disks = Disks::new_with_refreshed_list();
+    let disks = disks.list();
 
     SystemStats {
         host_name: System::host_name(),
