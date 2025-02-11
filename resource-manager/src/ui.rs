@@ -44,24 +44,6 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, processes: &[P
 
     create_stats_block(f, stats, main_chunks[0]);
     create_processes_block(f, processes, main_chunks[1]);
-
-    // let stats_area = main_chunks[0];
-    // let processes_area = main_chunks[1];
-
-    // let stats_chunks = Layout::default()
-    //         .direction(Direction::Vertical)
-    //         .constraints([
-    //             Constraint::Length(7), // CPU
-    //             Constraint::Length(7), // Memory
-    //             Constraint::Length(7), // Disk - maybe System chunk too?
-    //         ].as_ref())
-    //         .split(stats_area);
-
-    // // Draw chunks within respective chunks
-    // draw_cpu_section(f, stats, stats_chunks[0]);
-    // draw_memory_section(f, stats, stats_chunks[1]);
-    // draw_disk_section(f, stats, stats_chunks[2]);
-    // draw_processes_section(f, processes, processes_area);
 }
 
 pub fn create_processes_block<B: Backend>(f: &mut Frame<B>, processes: &[ProcessInfo], chunk: Rect) {
@@ -83,11 +65,10 @@ pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, chu
         .vertical_margin(1)
         .constraints(
             [
-                // Constraint::Percentage(7 + (num_cpus * 2)), // cpu
-                Constraint::Percentage(7),
-                Constraint::Percentage(160),                 // mem
-                Constraint::Percentage(31),                 // TBD
-                Constraint::Percentage(20),                 // metadata
+                Constraint::Percentage(7 + (stats.cpu_names.len() as u16 * 2)), // cpu
+                Constraint::Percentage(16),                              // mem
+                Constraint::Percentage(26),                              // TBD
+                Constraint::Percentage(15),                              // metadata
             ]
             .as_ref(),
         )
@@ -106,21 +87,47 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
 
     f.render_widget(block, area);
 
+    // Divide to split Global Usage and Individual CPU Usages
     let cpu_sub_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .horizontal_margin(1)
-        .vertical_margin(1)
-        .constraints(
-            [
-                // Constraint::Percentage(7 + (num_cpus * 2)), // cpu
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),   
-                Constraint::Percentage(20),      
-                Constraint::Percentage(20),
-            ]
-            .as_ref(),
-        )
+        .margin(0)
+        .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
         .split(area);
+    let global_usage = stats.cpu_global_usage.to_string();
+
+    let global_cpu_chunk = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(1)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(cpu_sub_chunks[0]);
+    render_label_value(f, "Global CPU Usage: ", global_usage, global_cpu_chunk[0], global_cpu_chunk[1]);
+    let indiv_cpus_chunk = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(1)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(cpu_sub_chunks[1]);
+    let num_cpus = stats.cpu_names.len();
+    let constraints = vec![Constraint::Length(1); num_cpus];
+    let indiv_cpus_label_chunk = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints(constraints.clone())
+        .split(indiv_cpus_chunk[0]);
+
+    let indiv_cpus_value_chunk = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints(constraints)
+        .split(indiv_cpus_chunk[1]);
+
+    for i in 0..num_cpus {
+        let cpu_name = format!("CPU {}", stats.cpu_names[i]);
+        render_label_value(f, &cpu_name, stats.cpu_cores[i].to_string(), indiv_cpus_label_chunk[i], indiv_cpus_value_chunk[i]);
+    }
+
+    
+
+    
 
 }
 
@@ -190,7 +197,46 @@ fn draw_system_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
     let block = Block::default()
         .title("System Stats")
         .borders(Borders::ALL);
-    f.render_widget(block, area)
+    f.render_widget(block, area);
+
+    // System block chunk
+    let sys_sub_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(0)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(area);
+
+    // System label subchunks
+    let sys_label_subchunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(sys_sub_chunks[0]);
+
+    // System number subchunks
+    let sys_num_subchunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(sys_sub_chunks[1]);
+
+    render_label_value(f, "Hostname: ", stats.host_name.clone().unwrap(), sys_label_subchunks[0], sys_num_subchunks[0]);
+    render_label_value(f, "Version: ", stats.os_version.clone().unwrap(), sys_label_subchunks[1], sys_num_subchunks[1]);
+    render_label_value(f, "Uptime: ", stats.uptime.to_string(), sys_label_subchunks[2], sys_num_subchunks[2]);
+    render_label_value(f, "CPU_Arch: ", stats.arch.to_string(), sys_label_subchunks[3], sys_num_subchunks[3]);
+    render_label_value(f, "OS: ", stats.os_name.clone().unwrap(), sys_label_subchunks[4], sys_num_subchunks[4]);
 }
 
 fn draw_processes_section<B: Backend>(f: &mut Frame<B>, processes: &[ProcessInfo], area: Rect) {

@@ -14,6 +14,7 @@ pub struct SystemStats {
     pub uptime: u64,
     pub arch: String,
     pub os_name: Option<String>,
+    pub cpu_names: Vec<String>,
     pub cpu_global_usage: f32,
     pub cpu_cores: Vec<f32>,
     pub total_memory: u64,
@@ -23,6 +24,11 @@ pub struct SystemStats {
 
 pub fn collect_system_stats(sys: &mut System) -> SystemStats {
     sys.refresh_all();
+    let cpu_names = sys
+            .cpus()
+            .iter()
+            .map(|cpu| cpu.name().to_string())
+            .collect::<Vec<String>>();
     let cpu_cores_usage = sys
             .cpus()
             .iter()
@@ -35,6 +41,7 @@ pub fn collect_system_stats(sys: &mut System) -> SystemStats {
         uptime: System::uptime(),
         arch: System::cpu_arch(),
         os_name: System::name(),
+        cpu_names: cpu_names,
         cpu_global_usage: sys.global_cpu_usage(),
         cpu_cores: cpu_cores_usage,
         total_memory: sys.total_memory(),
