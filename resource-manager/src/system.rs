@@ -7,7 +7,6 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use std::ffi::OsStr;
 
 pub struct SystemStats {
     pub host_name: Option<String>,

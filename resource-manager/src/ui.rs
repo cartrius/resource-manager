@@ -17,8 +17,9 @@ use tui::{
     Frame, Terminal,
 };
 use sysinfo::System;
+use sysinfo::Disks; // Remove later when refactoring the run_ui more into main.rs
 
-use crate::system::{collect_system_stats, render_cpu_stats, SystemStats};
+use crate::system::{collect_system_stats, collect_disks_stats, DisksStats, SystemStats};
 use crate::processes::{ProcessInfo, collect_processes};
 
 pub fn render_label_value<B: Backend>(f: &mut Frame<B>, label: &str, value: String, label_chunk: Rect, value_chunk: Rect) {
@@ -32,17 +33,17 @@ pub fn render_label_value<B: Backend>(f: &mut Frame<B>, label: &str, value: Stri
     f.render_widget(value_paragraph, value_chunk);
 }
 
-pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, processes: &[ProcessInfo]) {
+pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksStats, processes: &[ProcessInfo]) {
     // Main terminal frame
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(40),
-            Constraint::Percentage(60),
+            Constraint::Percentage(32),
+            Constraint::Percentage(68),
         ].as_ref())
         .split(f.size());
 
-    create_stats_block(f, stats, main_chunks[0]);
+    create_stats_block(f, stats, disks, main_chunks[0]);
     create_processes_block(f, processes, main_chunks[1]);
 }
 
@@ -53,7 +54,7 @@ pub fn create_processes_block<B: Backend>(f: &mut Frame<B>, processes: &[Process
     f.render_widget(block, chunk);
 }
 
-pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, chunk: Rect) {
+pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksStats, chunk: Rect) {
     let block = Block::default()
         .title("Stats")
         .borders(Borders::ALL);
@@ -65,10 +66,10 @@ pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, chu
         .vertical_margin(1)
         .constraints(
             [
-                Constraint::Percentage(7 + (stats.cpu_names.len() as u16 * 2)), // cpu
-                Constraint::Percentage(16),                              // mem
-                Constraint::Percentage(26),                              // TBD
-                Constraint::Percentage(15),                              // metadata
+                Constraint::Percentage(17 + (stats.cpu_names.len() as u16 * 2)), // cpu
+                Constraint::Percentage(26),                              // mem
+                Constraint::Percentage(30),                              // disks
+                Constraint::Percentage(4),                               // system stats
             ]
             .as_ref(),
         )
@@ -76,13 +77,13 @@ pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, chu
 
     draw_cpu_section(f, stats, sub_chunks[0]);
     draw_memory_section(f, stats, sub_chunks[1]);
-    draw_disk_section(f, stats, sub_chunks[2]);
+    draw_disk_section(f, &disks, sub_chunks[2]);
     draw_system_section(f, stats, sub_chunks[3]);
 }
 
 fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
     let block = Block::default()
-        .title("CPU Stats")
+        .title("CPU")
         .borders(Borders::ALL);
 
     f.render_widget(block, area);
@@ -103,7 +104,7 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
     render_label_value(f, "Global CPU Usage: ", global_usage, global_cpu_chunk[0], global_cpu_chunk[1]);
     let indiv_cpus_chunk = Layout::default()
         .direction(Direction::Horizontal)
-        .margin(1)
+        .margin(0)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(cpu_sub_chunks[1]);
     let num_cpus = stats.cpu_names.len();
@@ -129,7 +130,7 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
 
 fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
     let block = Block::default()
-        .title("Memory Stats")
+        .title("Memory")
         .borders(Borders::ALL);
 
     f.render_widget(block, area);
@@ -181,17 +182,68 @@ fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
     render_label_value(f, "Free Memory: ", stats.free_memory.to_string(), mem_label_subchunks[5], mem_num_subchunks[5]);
 }
 
-fn draw_disk_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
-    let block = Block::default()
-    .title("Disk Stats")
-    .borders(Borders::ALL);
+fn draw_disk_section<B: Backend>(f: &mut Frame<B>, disk_stats: &DisksStats, area: Rect) {
+    let num_disks = disk_stats.disk_names.len();
+    // We can use a chunk to split the current area Rect/Chunk and then create blocks for each one
+    let constraints =
+        vec![Constraint::Percentage(100 / (u16::try_from(num_disks).unwrap())); num_disks];
 
-    f.render_widget(block, area);
+    let disk_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints(constraints)
+        .split(area);
+
+    // For each disk
+    for i in 0..num_disks {
+        let block = Block::default()
+            .title(format!("Disk {i}"))
+            .borders(Borders::ALL);
+        
+        let disk_sub_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(0)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(disk_chunks[i]);
+
+        let disk_label_subchunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(disk_sub_chunks[0]);
+
+        // System number subchunks
+        let disk_num_subchunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(disk_sub_chunks[1]);
+
+        render_label_value(f, "Mount Point: ", disk_stats.disk_mnt_pts[i].clone(), disk_label_subchunks[0], disk_num_subchunks[0]);
+        render_label_value(f, "Name: ", disk_stats.disk_names[i].clone(), disk_label_subchunks[1], disk_num_subchunks[1]);
+        render_label_value(f, "Usage: ", disk_stats.disk_usages[i].clone(), disk_label_subchunks[2], disk_num_subchunks[2]);
+        render_label_value(f, "Filesystem: ", disk_stats.disk_filesystems[i].clone(), disk_label_subchunks[3], disk_num_subchunks[3]);
+        render_label_value(f, "Kind: ", disk_stats.disk_kinds[i].clone(), disk_label_subchunks[4], disk_num_subchunks[4]);
+        f.render_widget(block, disk_chunks[i]);
+    }
+
 }
 
 fn draw_system_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
     let block = Block::default()
-        .title("System Stats")
+        .title("System")
         .borders(Borders::ALL);
     f.render_widget(block, area);
 
@@ -261,10 +313,11 @@ pub fn run_terminal_ui() -> Result<()> {
         // Collect stats and processes
         let stats = collect_system_stats(&mut sys);
         let processes = collect_processes(&sys);
+        let disks = collect_disks_stats();
 
         // Draw terminal
         terminal.draw(|frame| {
-            draw_ui(frame, &stats, &processes);
+            draw_ui(frame, &stats, &disks, &processes);
         })?;
 
         // Check if user pressed 'q' or `ESC` to quit
