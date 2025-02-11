@@ -168,7 +168,10 @@ fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
         ])
         .split(mem_sub_chunks[1]);
 
+    // EVERYTHING STILL NEEDS ROUNDING
+    let mem_percentage = (stats.used_memory as f64 / stats.total_memory as f64 * 100.0).to_string();
     let avail_mem = stats.total_memory - stats.used_memory;
+    render_label_value(f, "Memory: ", mem_percentage, mem_label_subchunks[0], mem_num_subchunks[0]);
     render_label_value(f, "Total Memory: ", stats.total_memory.to_string(), mem_label_subchunks[2], mem_num_subchunks[2]);
     render_label_value(f, "Avail Memory: ", avail_mem.to_string(), mem_label_subchunks[3], mem_num_subchunks[3]);
     render_label_value(f, "Used Memory: ", stats.used_memory.to_string(), mem_label_subchunks[4], mem_num_subchunks[4]);
