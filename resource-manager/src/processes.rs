@@ -1,4 +1,4 @@
-use sysinfo::{Pid, Uid, Gid, Process, System};
+use sysinfo::{Pid, Uid, Gid, System};
 
 pub struct ProcessInfo {
     pub pid: Pid,
@@ -24,19 +24,5 @@ pub fn collect_processes(sys: &System) -> Vec<ProcessInfo> {
         })
     }
     process_info_vec
-}
-
-pub fn print_processes(sys: &System) {
-    let procs = collect_processes(sys);
-    for p in procs {
-        println!("PID: {:?}", p.pid);
-        println!("Name: {:?}", p.name);
-        println!("Memory: {:?}", p.memory);
-        println!("CPU: {:?}", p.cpu);
-        println!("Uptime: {:?}", p.uptime);
-        // println!("EUID: {:?}", p.euid.unwrap());
-        // println!("EGID: {:?}", p.egid.unwrap());
-        println!("-------------------");
-    }
 }
 

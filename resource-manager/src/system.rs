@@ -1,12 +1,4 @@
-use sysinfo::{Cpu, Disks, System};
-use tui::{
-    backend::Backend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
-    text::{Span, Spans},
-    widgets::{Block, Borders, Paragraph},
-    Frame,
-};
+use sysinfo::{Disks, System};
 
 pub struct SystemStats {
     pub host_name: Option<String>,
@@ -79,8 +71,6 @@ pub fn collect_system_stats(sys: &mut System) -> SystemStats {
             .iter()
             .map(|cpu| cpu.cpu_usage())
             .collect::<Vec<f32>>();
-    let disks = Disks::new_with_refreshed_list();
-    let disks = disks.list();
 
     SystemStats {
         host_name: System::host_name(),
@@ -95,39 +85,4 @@ pub fn collect_system_stats(sys: &mut System) -> SystemStats {
         used_memory: sys.used_memory(),
         free_memory: sys.free_memory(),
     }
-}
-
-pub fn print_stats(stats: &SystemStats) {
-    println!("Host Name: {:?}", stats.host_name);
-    println!("OS Version: {:?}", stats.os_version);
-    println!("Uptime: {}", stats.uptime);
-    println!("Arch: {:?}", stats.arch);
-    println!("OS Name: {:?}", stats.os_name);
-    println!("CPU Usage (global): {:.2}%", stats.cpu_global_usage);
-    println!("CPU usage per core: {:?}", stats.cpu_cores);
-    println!("Total memory: {}", stats.total_memory);
-    println!("Used memory: {}", stats.used_memory);
-    println!("Free memory: {}", stats.free_memory);
-}
-
-// Move in refactor later
-pub fn render_cpu_stats<B: Backend>(f: &mut Frame<B>, sys: &mut System, chunk: Rect) {
-    let cpu_stats = collect_system_stats(sys);
-    let cpu_chunk = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Length(2), Constraint::Length(10)])
-        .split(chunk);
-
-    // CPU Global Stats
-    let global_cpu_usage = cpu_stats.cpu_global_usage;
-    let prefix = Span::styled("Global CPU Usage: ", Style::default());
-    let percentage = Span::styled(format!("{:.2}%", global_cpu_usage), Style::default());
-    let global_percentage = Spans::from(vec![prefix, percentage]);
-    let global_percentage_text = Paragraph::new(global_percentage)
-        .block(Block::default().borders(Borders::NONE))
-        .alignment(Alignment::Left);
-    f.render_widget(global_percentage_text, cpu_chunk[0])
-
-
 }

@@ -20,6 +20,15 @@ use sysinfo::System;
 use crate::system::{collect_system_stats, collect_disks_stats, DisksStats, SystemStats};
 use crate::processes::{ProcessInfo, collect_processes};
 
+fn color_severity(s: String, num: f32) -> Span<'static> {
+    if num > 75.5 {
+        return Span::styled(s, Style::default().fg(Color::LightRed));
+    } else if num > 50.0 {
+        return Span::styled(s, Style::default().fg(Color::LightYellow));
+    }
+    return Span::styled(s, Style::default().fg(Color::LightGreen));
+}
+
 pub fn render_label_value<B: Backend>(f: &mut Frame<B>, label: &str, value: String, label_chunk: Rect, value_chunk: Rect) {
     let label_paragraph = Paragraph::new(Span::styled(label, Style::default()))
         .block(Block::default().borders(Borders::NONE))
@@ -36,8 +45,8 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksS
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(32),
-            Constraint::Percentage(68),
+            Constraint::Percentage(28),
+            Constraint::Percentage(72),
         ].as_ref())
         .split(f.size());
 
@@ -136,8 +145,7 @@ pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, dis
 
 fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
     let block = Block::default()
-        .title("CPU")
-        .borders(Borders::ALL);
+        .borders(Borders::NONE);
 
     f.render_widget(block, area);
 
@@ -147,14 +155,25 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
         .margin(0)
         .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
         .split(area);
-    let global_usage = format!("{:.2}%", stats.cpu_global_usage);
 
+    // GLOBAL CPU USAGE
+    let usage_val = stats.cpu_global_usage;
+    let usage_str = format!("{:.2}%", usage_val);
+    let usage_span = color_severity(usage_str, usage_val as f32);
     let global_cpu_chunk = Layout::default()
         .direction(Direction::Horizontal)
         .margin(1)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(cpu_sub_chunks[0]);
-    render_label_value(f, "Global CPU Usage: ", global_usage, global_cpu_chunk[0], global_cpu_chunk[1]);
+    let label_paragraph = Paragraph::new("Global CPU Usage: ")
+        .block(Block::default().borders(Borders::NONE))
+        .alignment(Alignment::Left);
+    f.render_widget(label_paragraph, global_cpu_chunk[0]);
+    let usage_paragraph = Paragraph::new(usage_span)
+        .block(Block::default().borders(Borders::NONE))
+        .alignment(Alignment::Right);
+    f.render_widget(usage_paragraph, global_cpu_chunk[1]);
+
     let indiv_cpus_chunk = Layout::default()
         .direction(Direction::Horizontal)
         .margin(0)
@@ -167,7 +186,6 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
         .margin(1)
         .constraints(constraints.clone())
         .split(indiv_cpus_chunk[0]);
-
     let indiv_cpus_value_chunk = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
@@ -183,8 +201,7 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
 
 fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
     let block = Block::default()
-        .title("Memory")
-        .borders(Borders::ALL);
+        .borders(Borders::NONE);
 
     f.render_widget(block, area);
 
@@ -225,10 +242,20 @@ fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
         ])
         .split(mem_sub_chunks[1]);
 
-    // EVERYTHING STILL NEEDS ROUNDING
-    let mem_percentage = (stats.used_memory as f64 / stats.total_memory as f64 * 100.0).to_string();
     let avail_mem = stats.total_memory - stats.used_memory;
-    render_label_value(f, "Memory: ", format!("{:.5}%", mem_percentage), mem_label_subchunks[0], mem_num_subchunks[0]);
+    let mem_percentage_val = (stats.used_memory as f64 / stats.total_memory as f64) * 100.0;
+    let mem_percentage_str = format!("{:.2}%", mem_percentage_val);
+    let colored_span = color_severity(mem_percentage_str, mem_percentage_val as f32);
+
+    // Render the “Memory"
+    let label_paragraph = Paragraph::new("Memory: ")
+        .block(Block::default().borders(Borders::NONE))
+        .alignment(Alignment::Left);
+    f.render_widget(label_paragraph, mem_label_subchunks[0]);
+    let value_paragraph = Paragraph::new(colored_span)
+        .block(Block::default().borders(Borders::NONE))
+        .alignment(Alignment::Right);
+    f.render_widget(value_paragraph, mem_num_subchunks[0]);
     render_label_value(f, "Total Memory: ", format!("{:.2} GB", (stats.total_memory as f64 / 1000000000.0)), mem_label_subchunks[2], mem_num_subchunks[2]);
     render_label_value(f, "Avail Memory: ", format!("{:.2} GB", (avail_mem as f64 / 1000000000.0)), mem_label_subchunks[3], mem_num_subchunks[3]);
     render_label_value(f, "Used Memory: ", format!("{:.2} GB", (stats.used_memory as f64 / 1000000000.0)), mem_label_subchunks[4], mem_num_subchunks[4]);
@@ -237,42 +264,46 @@ fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
 
 fn draw_disk_section<B: Backend>(f: &mut Frame<B>, disk_stats: &DisksStats, area: Rect) {
     let num_disks = disk_stats.disk_names.len();
-    // We can use a chunk to split the current area Rect/Chunk and then create blocks for each one
-    let constraints =
-        vec![Constraint::Percentage(100 / (u16::try_from(num_disks).unwrap())); num_disks];
-
+    let constraints = vec![Constraint::Percentage(100 / (num_disks as u16)); num_disks];
     let disk_chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
         .constraints(constraints)
         .split(area);
 
-    // For each disk
     for i in 0..num_disks {
         let block = Block::default()
             .title(format!("Disk {i}"))
             .borders(Borders::ALL);
-        
+        f.render_widget(block.clone(), disk_chunks[i]);
+
+        // Inner area for the disk block
+        let inner_area = block.inner(disk_chunks[i]);
         let disk_sub_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .margin(0)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(disk_chunks[i]);
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(inner_area);
 
-        let disk_label_subchunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ])
-        .split(disk_sub_chunks[0]);
+        // Color-code disk usage
+        let usage_val = disk_stats.disk_usages[i].parse::<f32>().unwrap();
+        let usage_str = format!("{:.2}%", usage_val);
+        let usage_span = color_severity(usage_str, usage_val);
 
-        // System number subchunks
-        let disk_num_subchunks = Layout::default()
+        // Left column label chunk
+        let label_col = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(1), // Mount point
+                Constraint::Length(1), // Name
+                Constraint::Length(1), // Usage label
+                Constraint::Length(1), // Filesystem
+                Constraint::Length(1), // Kind
+            ])
+            .split(disk_sub_chunks[0]);
+
+        // Right column value chunk
+        let value_col = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
@@ -283,21 +314,56 @@ fn draw_disk_section<B: Backend>(f: &mut Frame<B>, disk_stats: &DisksStats, area
                 Constraint::Length(1),
             ])
             .split(disk_sub_chunks[1]);
-        
-        render_label_value(f, "Mount Point: ", disk_stats.disk_mnt_pts[i].clone(), disk_label_subchunks[0], disk_num_subchunks[0]);
-        render_label_value(f, "Name: ", disk_stats.disk_names[i].clone(), disk_label_subchunks[1], disk_num_subchunks[1]);
-        render_label_value(f, "Usage: ", format!("{:.5}%", disk_stats.disk_usages[i].clone()), disk_label_subchunks[2], disk_num_subchunks[2]);
-        render_label_value(f, "Filesystem: ", disk_stats.disk_filesystems[i].clone(), disk_label_subchunks[3], disk_num_subchunks[3]);
-        render_label_value(f, "Kind: ", disk_stats.disk_kinds[i].clone(), disk_label_subchunks[4], disk_num_subchunks[4]);
-        f.render_widget(block, disk_chunks[i]);
+
+        render_label_value(
+            f,
+            "Mount Point: ",
+            disk_stats.disk_mnt_pts[i].clone(),
+            label_col[0],
+            value_col[0],
+        );
+
+        render_label_value(
+            f,
+            "Name: ",
+            disk_stats.disk_names[i].clone(),
+            label_col[1],
+            value_col[1],
+        );
+
+        // Color-code Usage
+        let label_usage = Paragraph::new("Usage: ")
+            .block(Block::default().borders(Borders::NONE))
+            .alignment(Alignment::Left);
+        f.render_widget(label_usage, label_col[2]);
+
+        let usage_par = Paragraph::new(usage_span)
+            .block(Block::default().borders(Borders::NONE))
+            .alignment(Alignment::Right);
+        f.render_widget(usage_par, value_col[2]);
+
+        render_label_value(
+            f,
+            "Filesystem: ",
+            disk_stats.disk_filesystems[i].clone(),
+            label_col[3],
+            value_col[3],
+        );
+
+        render_label_value(
+            f,
+            "Kind: ",
+            disk_stats.disk_kinds[i].clone(),
+            label_col[4],
+            value_col[4],
+        );
     }
 
 }
 
 fn draw_system_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
     let block = Block::default()
-        .title("System")
-        .borders(Borders::ALL);
+        .borders(Borders::NONE);
     f.render_widget(block, area);
 
     // System block chunk
