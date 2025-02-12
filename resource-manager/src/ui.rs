@@ -12,8 +12,8 @@ use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Layout, Constraint, Direction, Rect},
     text::Span,
-    style::Style,
-    widgets::{Block, Borders, Paragraph},
+    style::{Style, Color, Modifier},
+    widgets::{Block, Borders, Cell, Paragraph, Table, Row},
     Frame, Terminal,
 };
 use sysinfo::System;
@@ -52,6 +52,25 @@ pub fn create_processes_block<B: Backend>(f: &mut Frame<B>, processes: &[Process
         .title("Processes")
         .borders(Borders::ALL);
     f.render_widget(block, chunk);
+
+    // Create horizontal chunks to fit PID, Name, Mem (MB), CPU, Uptime (s), EUID/EGID
+    // We want the number of pid verticle sections, and enough horiztonal sections to hold the different data
+    // let process_rows = Row::new(vec!["PID", "Name", "Mem (MB)", "CPU", "Uptime (s)", "EUID/EGID"]).style(Style::default().fg(Color::Blue));
+  
+
+    // let table = Table::new(process_rows)
+    //     .header(header)
+    //     .block(Block::default().borders(Borders::NONE))
+    //     .widths(&[
+    //         Constraint::Percentage(8),  // pid
+    //         Constraint::Percentage(32), // name
+    //         Constraint::Percentage(13), // memory
+    //         Constraint::Percentage(10), // cpu
+    //         Constraint::Percentage(16), // uptime
+    //         Constraint::Percentage(19), // euid/egid
+    //     ]);
+
+    // f.render_widget(table, chunk);
 }
 
 pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksStats, chunk: Rect) {
@@ -94,7 +113,7 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
         .margin(0)
         .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
         .split(area);
-    let global_usage = stats.cpu_global_usage.to_string();
+    let global_usage = format!("{:.5}%", stats.cpu_global_usage.to_string());
 
     let global_cpu_chunk = Layout::default()
         .direction(Direction::Horizontal)
@@ -123,7 +142,7 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
 
     for i in 0..num_cpus {
         let cpu_name = format!("CPU {}", stats.cpu_names[i]);
-        render_label_value(f, &cpu_name, stats.cpu_cores[i].to_string(), indiv_cpus_label_chunk[i], indiv_cpus_value_chunk[i]);
+        render_label_value(f, &cpu_name, format!("{:.5}%", stats.cpu_cores[i].to_string()), indiv_cpus_label_chunk[i], indiv_cpus_value_chunk[i]);
     }
 
 }
@@ -175,11 +194,11 @@ fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
     // EVERYTHING STILL NEEDS ROUNDING
     let mem_percentage = (stats.used_memory as f64 / stats.total_memory as f64 * 100.0).to_string();
     let avail_mem = stats.total_memory - stats.used_memory;
-    render_label_value(f, "Memory: ", mem_percentage, mem_label_subchunks[0], mem_num_subchunks[0]);
-    render_label_value(f, "Total Memory: ", stats.total_memory.to_string(), mem_label_subchunks[2], mem_num_subchunks[2]);
-    render_label_value(f, "Avail Memory: ", avail_mem.to_string(), mem_label_subchunks[3], mem_num_subchunks[3]);
-    render_label_value(f, "Used Memory: ", stats.used_memory.to_string(), mem_label_subchunks[4], mem_num_subchunks[4]);
-    render_label_value(f, "Free Memory: ", stats.free_memory.to_string(), mem_label_subchunks[5], mem_num_subchunks[5]);
+    render_label_value(f, "Memory: ", format!("{:.5}%", mem_percentage), mem_label_subchunks[0], mem_num_subchunks[0]);
+    render_label_value(f, "Total Memory: ", format!("{:.2} GB", (stats.total_memory as f64 / 1000000000.0)), mem_label_subchunks[2], mem_num_subchunks[2]);
+    render_label_value(f, "Avail Memory: ", format!("{:.2} GB", (avail_mem as f64 / 1000000000.0)), mem_label_subchunks[3], mem_num_subchunks[3]);
+    render_label_value(f, "Used Memory: ", format!("{:.2} GB", (stats.used_memory as f64 / 1000000000.0)), mem_label_subchunks[4], mem_num_subchunks[4]);
+    render_label_value(f, "Free Memory: ", format!("{:.2} MB", (stats.free_memory as f64 / 1000000.0)), mem_label_subchunks[5], mem_num_subchunks[5]);
 }
 
 fn draw_disk_section<B: Backend>(f: &mut Frame<B>, disk_stats: &DisksStats, area: Rect) {
