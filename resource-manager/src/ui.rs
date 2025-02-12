@@ -1,24 +1,13 @@
-use std::{
-    io::{self, Result},
-    time::Duration,
-};
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use tui::{
-    backend::{Backend, CrosstermBackend},
+    backend::Backend,
     layout::{Alignment, Layout, Constraint, Direction, Rect},
     text::Span,
     style::{Style, Color, Modifier},
     widgets::{Block, Borders, Paragraph, Table, Row},
-    Frame, Terminal,
+    Frame,
 };
-use sysinfo::System;
-
-use crate::system::{collect_system_stats, collect_disks_stats, DisksStats, SystemStats};
-use crate::processes::{ProcessInfo, collect_processes};
+use crate::system::{DisksStats, SystemStats};
+use crate::processes::ProcessInfo;
 
 fn color_severity(s: String, num: f32) -> Span<'static> {
     if num > 75.5 {
@@ -404,47 +393,4 @@ fn draw_system_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
     render_label_value(f, "Uptime: ", stats.uptime.to_string(), sys_label_subchunks[2], sys_num_subchunks[2]);
     render_label_value(f, "CPU_Arch: ", stats.arch.to_string(), sys_label_subchunks[3], sys_num_subchunks[3]);
     render_label_value(f, "OS: ", stats.os_name.clone().unwrap(), sys_label_subchunks[4], sys_num_subchunks[4]);
-}
-
-pub fn run_terminal_ui() -> Result<()> {
-    // Setup terminal in raw mode
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let mut sys = System::new_all();
-
-    loop {
-        // Refresh data
-        sys.refresh_all();
-        // Collect stats and processes
-        let stats = collect_system_stats(&mut sys);
-        let processes = collect_processes(&sys);
-        let disks = collect_disks_stats();
-
-        // Draw terminal
-        terminal.draw(|frame| {
-            draw_ui(frame, &stats, &disks, &processes);
-        })?;
-
-        // Check if user pressed 'q' or `ESC` to quit
-        if crossterm::event::poll(Duration::from_millis(200))? {
-            if let Event::Key(key_event) = event::read()? {
-                if key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Esc {
-                    break;
-                }
-            }
-        }
-    }
-
-    // Cleanup
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-    Ok(())
 }
