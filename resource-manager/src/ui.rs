@@ -1,6 +1,5 @@
 use std::{
     io::{self, Result},
-    thread,
     time::Duration,
 };
 use crossterm::{
@@ -13,11 +12,10 @@ use tui::{
     layout::{Alignment, Layout, Constraint, Direction, Rect},
     text::Span,
     style::{Style, Color, Modifier},
-    widgets::{Block, Borders, Cell, Paragraph, Table, Row},
+    widgets::{Block, Borders, Paragraph, Table, Row},
     Frame, Terminal,
 };
 use sysinfo::System;
-use sysinfo::Disks; // Remove later when refactoring the run_ui more into main.rs
 
 use crate::system::{collect_system_stats, collect_disks_stats, DisksStats, SystemStats};
 use crate::processes::{ProcessInfo, collect_processes};
@@ -48,29 +46,65 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksS
 }
 
 pub fn create_processes_block<B: Backend>(f: &mut Frame<B>, processes: &[ProcessInfo], chunk: Rect) {
-    let block = Block::default()
-        .title("Processes")
-        .borders(Borders::ALL);
-    f.render_widget(block, chunk);
+     let processes_block = Block::default()
+     .title("Processes")
+     .borders(Borders::ALL);
+ f.render_widget(processes_block.clone(), chunk);
 
-    // Create horizontal chunks to fit PID, Name, Mem (MB), CPU, Uptime (s), EUID/EGID
-    // We want the number of pid verticle sections, and enough horiztonal sections to hold the different data
-    // let process_rows = Row::new(vec!["PID", "Name", "Mem (MB)", "CPU", "Uptime (s)", "EUID/EGID"]).style(Style::default().fg(Color::Blue));
-  
+ let inner_area = processes_block.inner(chunk);
+ let process_margined_chunk = Layout::default()
+ .direction(Direction::Horizontal)
+ .horizontal_margin(3)
+ .vertical_margin(2)
+ .constraints([Constraint::Percentage(100)].as_ref())
+ .split(inner_area)[0];
+ let mut rows = Vec::new();
+ for p in processes {
+     let mem_mb = (p.memory as f64) / 1000000.0;
+     let euid_egid = match (p.euid.clone(), p.egid) {
+        (Some(_), Some(_)) => format!("{:?}/{:?}", *p.euid.clone().unwrap(), *p.egid.unwrap()),
+        (Some(_), None)       => format!("{:?} / N/A", *p.euid.clone().unwrap()),
+        (None, Some(_))       => format!("N/A / {:?}", *p.egid.unwrap()),
+        (None, None)            => String::from("N/A"),
+    };
 
-    // let table = Table::new(process_rows)
-    //     .header(header)
-    //     .block(Block::default().borders(Borders::NONE))
-    //     .widths(&[
-    //         Constraint::Percentage(8),  // pid
-    //         Constraint::Percentage(32), // name
-    //         Constraint::Percentage(13), // memory
-    //         Constraint::Percentage(10), // cpu
-    //         Constraint::Percentage(16), // uptime
-    //         Constraint::Percentage(19), // euid/egid
-    //     ]);
+     let row = Row::new(vec![
+         p.pid.to_string(),
+         p.name.clone(),
+         format!("{:.2}", mem_mb),
+         format!("{:.2}%", p.cpu * 100.0), 
+         p.uptime.to_string(),
+         euid_egid,
+     ]);
 
-    // f.render_widget(table, chunk);
+     rows.push(row);
+ }
+
+ // Column Names
+ let header = Row::new(vec![
+     "PID", "Name", "Mem (MB)", "CPU", "Uptime (s)", "EUID/EGID"
+ ])
+ .style(Style::default().fg(Color::Yellow))
+ .bottom_margin(1);
+
+ let table = Table::new(rows)
+     .header(header)
+     .block(
+         Block::default().borders(Borders::NONE)
+     )
+     .widths(&[
+        Constraint::Percentage(8),  // PID
+        Constraint::Percentage(32), // NAME
+        Constraint::Percentage(13), // MEM (MB)
+        Constraint::Percentage(10), // CPU
+        Constraint::Percentage(16), // UPTIME (s)
+        Constraint::Percentage(19), // EUID/EGID
+     ])
+     .column_spacing(2) // extra space between columns
+     .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+     .highlight_symbol(">>");
+
+ f.render_widget(table, process_margined_chunk);
 }
 
 pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksStats, chunk: Rect) {
@@ -81,14 +115,14 @@ pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, dis
 
     let sub_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .horizontal_margin(1)
-        .vertical_margin(1)
+        .horizontal_margin(3)
+        .vertical_margin(2)
         .constraints(
             [
-                Constraint::Percentage(17 + (stats.cpu_names.len() as u16 * 2)), // cpu
-                Constraint::Percentage(26),                              // mem
-                Constraint::Percentage(30),                              // disks
-                Constraint::Percentage(4),                               // system stats
+                Constraint::Percentage(10 + (stats.cpu_names.len() as u16 * 2)), // cpu
+                Constraint::Percentage(15),                              // mem
+                Constraint::Percentage(50),                              // disks
+                Constraint::Percentage(10),                               // system stats
             ]
             .as_ref(),
         )
@@ -113,7 +147,7 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
         .margin(0)
         .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
         .split(area);
-    let global_usage = format!("{:.5}%", stats.cpu_global_usage.to_string());
+    let global_usage = format!("{:.2}%", stats.cpu_global_usage);
 
     let global_cpu_chunk = Layout::default()
         .direction(Direction::Horizontal)
@@ -142,7 +176,7 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
 
     for i in 0..num_cpus {
         let cpu_name = format!("CPU {}", stats.cpu_names[i]);
-        render_label_value(f, &cpu_name, format!("{:.5}%", stats.cpu_cores[i].to_string()), indiv_cpus_label_chunk[i], indiv_cpus_value_chunk[i]);
+        render_label_value(f, &cpu_name, format!("{:.2}%", stats.cpu_cores[i]), indiv_cpus_label_chunk[i], indiv_cpus_value_chunk[i]);
     }
 
 }
@@ -249,10 +283,10 @@ fn draw_disk_section<B: Backend>(f: &mut Frame<B>, disk_stats: &DisksStats, area
                 Constraint::Length(1),
             ])
             .split(disk_sub_chunks[1]);
-
+        
         render_label_value(f, "Mount Point: ", disk_stats.disk_mnt_pts[i].clone(), disk_label_subchunks[0], disk_num_subchunks[0]);
         render_label_value(f, "Name: ", disk_stats.disk_names[i].clone(), disk_label_subchunks[1], disk_num_subchunks[1]);
-        render_label_value(f, "Usage: ", disk_stats.disk_usages[i].clone(), disk_label_subchunks[2], disk_num_subchunks[2]);
+        render_label_value(f, "Usage: ", format!("{:.5}%", disk_stats.disk_usages[i].clone()), disk_label_subchunks[2], disk_num_subchunks[2]);
         render_label_value(f, "Filesystem: ", disk_stats.disk_filesystems[i].clone(), disk_label_subchunks[3], disk_num_subchunks[3]);
         render_label_value(f, "Kind: ", disk_stats.disk_kinds[i].clone(), disk_label_subchunks[4], disk_num_subchunks[4]);
         f.render_widget(block, disk_chunks[i]);
@@ -305,17 +339,6 @@ fn draw_system_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
     render_label_value(f, "CPU_Arch: ", stats.arch.to_string(), sys_label_subchunks[3], sys_num_subchunks[3]);
     render_label_value(f, "OS: ", stats.os_name.clone().unwrap(), sys_label_subchunks[4], sys_num_subchunks[4]);
 }
-
-fn draw_processes_section<B: Backend>(f: &mut Frame<B>, processes: &[ProcessInfo], area: Rect) {
-    let block = Block::default().title("Processes").borders(Borders::ALL);
-    f.render_widget(block, area);
-
-    // let inner_area = block.inner(area);
-    // Maybe use a Table or Paragraph to show info
-    // let table = Table::new(...)
-    // f.render_widget(table, inner_area);
-}
-
 
 pub fn run_terminal_ui() -> Result<()> {
     // Setup terminal in raw mode

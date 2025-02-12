@@ -41,10 +41,6 @@ pub fn collect_disks_stats() -> DisksStats {
         .iter()
         .map(|disk| disk.mount_point().to_string_lossy().to_string())
         .collect::<Vec<String>>();
-    let disk_usgs: Vec<String> = disk_list
-        .iter()
-        .map(|disk| format!("{:?}", disk.usage()))
-        .collect::<Vec<String>>();
     let disk_systems = disk_list
         .iter()
         .map(|disk| disk.file_system().to_string_lossy().to_string())
@@ -53,7 +49,15 @@ pub fn collect_disks_stats() -> DisksStats {
         .iter()
         .map(|disk| disk.kind().to_string())
         .collect::<Vec<String>>();
-
+    let mut disk_usgs: Vec<String> = Vec::new();
+    for disk in disks.list() {
+        let total_space = disk.total_space();
+        let available_space = disk.available_space();
+        let used_space = total_space - available_space;
+        let percentage_used = ((used_space as f64 / total_space as f64) * 100.0) as f32;
+        disk_usgs.push(percentage_used.to_string());
+    }
+        
     DisksStats {
         disk_names: disk_names,
         disk_mnt_pts: disk_mnts,
