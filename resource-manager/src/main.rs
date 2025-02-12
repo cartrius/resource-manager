@@ -43,7 +43,7 @@ fn main() -> Result<()> {
         })?;
 
         // Check if user pressed 'q' or `ESC` to quit
-        if crossterm::event::poll(Duration::from_millis(200))? {
+        if crossterm::event::poll(Duration::from_millis(400))? {
             if let Event::Key(key_event) = event::read()? {
                 if key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Esc {
                     break;
