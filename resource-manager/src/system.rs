@@ -26,9 +26,9 @@ pub fn collect_disks_stats() -> DisksStats {
     let disks = Disks::new_with_refreshed_list();
     let disk_list = disks.list();
     let disk_names = disk_list
-            .iter()
-            .map(|disk| disk.name().to_string_lossy().to_string())
-            .collect::<Vec<String>>();
+        .iter()
+        .map(|disk| disk.name().to_string_lossy().to_string())
+        .collect::<Vec<String>>();
     let disk_mnts = disk_list
         .iter()
         .map(|disk| disk.mount_point().to_string_lossy().to_string())
@@ -49,7 +49,7 @@ pub fn collect_disks_stats() -> DisksStats {
         let percentage_used = ((used_space as f64 / total_space as f64) * 100.0) as f32;
         disk_usgs.push(percentage_used.to_string());
     }
-        
+
     DisksStats {
         disk_names: disk_names,
         disk_mnt_pts: disk_mnts,
@@ -62,15 +62,15 @@ pub fn collect_disks_stats() -> DisksStats {
 pub fn collect_system_stats(sys: &mut System) -> SystemStats {
     sys.refresh_all();
     let cpu_names = sys
-            .cpus()
-            .iter()
-            .map(|cpu| cpu.name().to_string())
-            .collect::<Vec<String>>();
+        .cpus()
+        .iter()
+        .map(|cpu| cpu.name().to_string())
+        .collect::<Vec<String>>();
     let cpu_cores_usage = sys
-            .cpus()
-            .iter()
-            .map(|cpu| cpu.cpu_usage())
-            .collect::<Vec<f32>>();
+        .cpus()
+        .iter()
+        .map(|cpu| cpu.cpu_usage())
+        .collect::<Vec<f32>>();
 
     SystemStats {
         host_name: System::host_name(),

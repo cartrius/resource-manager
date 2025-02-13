@@ -1,13 +1,13 @@
+use crate::processes::ProcessInfo;
+use crate::system::{DisksStats, SystemStats};
 use tui::{
     backend::Backend,
-    layout::{Alignment, Layout, Constraint, Direction, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
     text::Span,
-    style::{Style, Color, Modifier},
-    widgets::{Block, Borders, Paragraph, Table, Row},
+    widgets::{Block, Borders, Paragraph, Row, Table},
     Frame,
 };
-use crate::system::{DisksStats, SystemStats};
-use crate::processes::ProcessInfo;
 
 fn color_severity(s: String, num: f32) -> Span<'static> {
     if num > 75.5 {
@@ -18,7 +18,13 @@ fn color_severity(s: String, num: f32) -> Span<'static> {
     return Span::styled(s, Style::default().fg(Color::LightGreen));
 }
 
-pub fn render_label_value<B: Backend>(f: &mut Frame<B>, label: &str, value: String, label_chunk: Rect, value_chunk: Rect) {
+pub fn render_label_value<B: Backend>(
+    f: &mut Frame<B>,
+    label: &str,
+    value: String,
+    label_chunk: Rect,
+    value_chunk: Rect,
+) {
     let label_paragraph = Paragraph::new(Span::styled(label, Style::default()))
         .block(Block::default().borders(Borders::NONE))
         .alignment(Alignment::Left);
@@ -29,86 +35,96 @@ pub fn render_label_value<B: Backend>(f: &mut Frame<B>, label: &str, value: Stri
     f.render_widget(value_paragraph, value_chunk);
 }
 
-pub fn draw_ui<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksStats, processes: &[ProcessInfo]) {
+pub fn draw_ui<B: Backend>(
+    f: &mut Frame<B>,
+    stats: &SystemStats,
+    disks: &DisksStats,
+    processes: &[ProcessInfo],
+) {
     // Main terminal frame
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(28),
-            Constraint::Percentage(72),
-        ].as_ref())
+        .constraints([Constraint::Percentage(28), Constraint::Percentage(72)].as_ref())
         .split(f.size());
 
     create_stats_block(f, stats, disks, main_chunks[0]);
     create_processes_block(f, processes, main_chunks[1]);
 }
 
-pub fn create_processes_block<B: Backend>(f: &mut Frame<B>, processes: &[ProcessInfo], chunk: Rect) {
-     let processes_block = Block::default()
-     .title("Processes")
-     .borders(Borders::ALL);
- f.render_widget(processes_block.clone(), chunk);
+pub fn create_processes_block<B: Backend>(
+    f: &mut Frame<B>,
+    processes: &[ProcessInfo],
+    chunk: Rect,
+) {
+    let processes_block = Block::default().title("Processes").borders(Borders::ALL);
+    f.render_widget(processes_block.clone(), chunk);
 
- let inner_area = processes_block.inner(chunk);
- let process_margined_chunk = Layout::default()
- .direction(Direction::Horizontal)
- .horizontal_margin(3)
- .vertical_margin(2)
- .constraints([Constraint::Percentage(100)].as_ref())
- .split(inner_area)[0];
- let mut rows = Vec::new();
- for p in processes {
-     let mem_mb = (p.memory as f64) / 1000000.0;
-     let euid_egid = match (p.euid.clone(), p.egid) {
-        (Some(_), Some(_)) => format!("{:?}/{:?}", *p.euid.clone().unwrap(), *p.egid.unwrap()),
-        (Some(_), None)       => format!("{:?} / N/A", *p.euid.clone().unwrap()),
-        (None, Some(_))       => format!("N/A / {:?}", *p.egid.unwrap()),
-        (None, None)            => String::from("N/A"),
-    };
+    let inner_area = processes_block.inner(chunk);
+    let process_margined_chunk = Layout::default()
+        .direction(Direction::Horizontal)
+        .horizontal_margin(3)
+        .vertical_margin(2)
+        .constraints([Constraint::Percentage(100)].as_ref())
+        .split(inner_area)[0];
+    let mut rows = Vec::new();
+    for p in processes {
+        let mem_mb = (p.memory as f64) / 1000000.0;
+        let euid_egid = match (p.euid.clone(), p.egid) {
+            (Some(_), Some(_)) => format!("{:?}/{:?}", *p.euid.clone().unwrap(), *p.egid.unwrap()),
+            (Some(_), None) => format!("{:?} / N/A", *p.euid.clone().unwrap()),
+            (None, Some(_)) => format!("N/A / {:?}", *p.egid.unwrap()),
+            (None, None) => String::from("N/A"),
+        };
 
-     let row = Row::new(vec![
-         p.pid.to_string(),
-         p.name.clone(),
-         format!("{:.2}", mem_mb),
-         format!("{:.2}%", p.cpu * 100.0), 
-         p.uptime.to_string(),
-         euid_egid,
-     ]);
+        let row = Row::new(vec![
+            p.pid.to_string(),
+            p.name.clone(),
+            format!("{:.2}", mem_mb),
+            format!("{:.2}%", p.cpu * 100.0),
+            p.uptime.to_string(),
+            euid_egid,
+        ]);
 
-     rows.push(row);
- }
+        rows.push(row);
+    }
 
- // Column Names
- let header = Row::new(vec![
-     "PID", "Name", "Mem (MB)", "CPU", "Uptime (s)", "EUID/EGID"
- ])
- .style(Style::default().fg(Color::Yellow))
- .bottom_margin(1);
+    // Column Names
+    let header = Row::new(vec![
+        "PID",
+        "Name",
+        "Mem (MB)",
+        "CPU",
+        "Uptime (s)",
+        "EUID/EGID",
+    ])
+    .style(Style::default().fg(Color::Yellow))
+    .bottom_margin(1);
 
- let table = Table::new(rows)
-     .header(header)
-     .block(
-         Block::default().borders(Borders::NONE)
-     )
-     .widths(&[
-        Constraint::Percentage(8),  // PID
-        Constraint::Percentage(32), // NAME
-        Constraint::Percentage(13), // MEM (MB)
-        Constraint::Percentage(10), // CPU
-        Constraint::Percentage(16), // UPTIME (s)
-        Constraint::Percentage(19), // EUID/EGID
-     ])
-     .column_spacing(2) // extra space between columns
-     .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-     .highlight_symbol(">>");
+    let table = Table::new(rows)
+        .header(header)
+        .block(Block::default().borders(Borders::NONE))
+        .widths(&[
+            Constraint::Percentage(8),  // PID
+            Constraint::Percentage(32), // NAME
+            Constraint::Percentage(13), // MEM (MB)
+            Constraint::Percentage(10), // CPU
+            Constraint::Percentage(16), // UPTIME (s)
+            Constraint::Percentage(19), // EUID/EGID
+        ])
+        .column_spacing(2) // extra space between columns
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+        .highlight_symbol(">>");
 
- f.render_widget(table, process_margined_chunk);
+    f.render_widget(table, process_margined_chunk);
 }
 
-pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, disks: &DisksStats, chunk: Rect) {
-    let block = Block::default()
-        .title("Stats")
-        .borders(Borders::ALL);
+pub fn create_stats_block<B: Backend>(
+    f: &mut Frame<B>,
+    stats: &SystemStats,
+    disks: &DisksStats,
+    chunk: Rect,
+) {
+    let block = Block::default().title("Stats").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
     let sub_chunks = Layout::default()
@@ -118,9 +134,9 @@ pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, dis
         .constraints(
             [
                 Constraint::Percentage(10 + (stats.cpu_names.len() as u16 * 2)), // cpu
-                Constraint::Percentage(15),                              // mem
-                Constraint::Percentage(50),                              // disks
-                Constraint::Percentage(10),                               // system stats
+                Constraint::Percentage(15),                                      // mem
+                Constraint::Percentage(50),                                      // disks
+                Constraint::Percentage(10),                                      // system stats
             ]
             .as_ref(),
         )
@@ -133,8 +149,7 @@ pub fn create_stats_block<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, dis
 }
 
 fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::NONE);
+    let block = Block::default().borders(Borders::NONE);
 
     f.render_widget(block, area);
 
@@ -183,14 +198,18 @@ fn draw_cpu_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rec
 
     for i in 0..num_cpus {
         let cpu_name = format!("CPU {}", stats.cpu_names[i]);
-        render_label_value(f, &cpu_name, format!("{:.2}%", stats.cpu_cores[i]), indiv_cpus_label_chunk[i], indiv_cpus_value_chunk[i]);
+        render_label_value(
+            f,
+            &cpu_name,
+            format!("{:.2}%", stats.cpu_cores[i]),
+            indiv_cpus_label_chunk[i],
+            indiv_cpus_value_chunk[i],
+        );
     }
-
 }
 
 fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::NONE);
+    let block = Block::default().borders(Borders::NONE);
 
     f.render_widget(block, area);
 
@@ -245,10 +264,34 @@ fn draw_memory_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
         .block(Block::default().borders(Borders::NONE))
         .alignment(Alignment::Right);
     f.render_widget(value_paragraph, mem_num_subchunks[0]);
-    render_label_value(f, "Total Memory: ", format!("{:.2} GB", (stats.total_memory as f64 / 1000000000.0)), mem_label_subchunks[2], mem_num_subchunks[2]);
-    render_label_value(f, "Avail Memory: ", format!("{:.2} GB", (avail_mem as f64 / 1000000000.0)), mem_label_subchunks[3], mem_num_subchunks[3]);
-    render_label_value(f, "Used Memory: ", format!("{:.2} GB", (stats.used_memory as f64 / 1000000000.0)), mem_label_subchunks[4], mem_num_subchunks[4]);
-    render_label_value(f, "Free Memory: ", format!("{:.2} MB", (stats.free_memory as f64 / 1000000.0)), mem_label_subchunks[5], mem_num_subchunks[5]);
+    render_label_value(
+        f,
+        "Total Memory: ",
+        format!("{:.2} GB", (stats.total_memory as f64 / 1000000000.0)),
+        mem_label_subchunks[2],
+        mem_num_subchunks[2],
+    );
+    render_label_value(
+        f,
+        "Avail Memory: ",
+        format!("{:.2} GB", (avail_mem as f64 / 1000000000.0)),
+        mem_label_subchunks[3],
+        mem_num_subchunks[3],
+    );
+    render_label_value(
+        f,
+        "Used Memory: ",
+        format!("{:.2} GB", (stats.used_memory as f64 / 1000000000.0)),
+        mem_label_subchunks[4],
+        mem_num_subchunks[4],
+    );
+    render_label_value(
+        f,
+        "Free Memory: ",
+        format!("{:.2} MB", (stats.free_memory as f64 / 1000000.0)),
+        mem_label_subchunks[5],
+        mem_num_subchunks[5],
+    );
 }
 
 fn draw_disk_section<B: Backend>(f: &mut Frame<B>, disk_stats: &DisksStats, area: Rect) {
@@ -347,12 +390,10 @@ fn draw_disk_section<B: Backend>(f: &mut Frame<B>, disk_stats: &DisksStats, area
             value_col[4],
         );
     }
-
 }
 
 fn draw_system_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::NONE);
+    let block = Block::default().borders(Borders::NONE);
     f.render_widget(block, area);
 
     // System block chunk
@@ -388,9 +429,39 @@ fn draw_system_section<B: Backend>(f: &mut Frame<B>, stats: &SystemStats, area: 
         ])
         .split(sys_sub_chunks[1]);
 
-    render_label_value(f, "Hostname: ", stats.host_name.clone().unwrap(), sys_label_subchunks[0], sys_num_subchunks[0]);
-    render_label_value(f, "Version: ", stats.os_version.clone().unwrap(), sys_label_subchunks[1], sys_num_subchunks[1]);
-    render_label_value(f, "Uptime: ", stats.uptime.to_string(), sys_label_subchunks[2], sys_num_subchunks[2]);
-    render_label_value(f, "CPU_Arch: ", stats.arch.to_string(), sys_label_subchunks[3], sys_num_subchunks[3]);
-    render_label_value(f, "OS: ", stats.os_name.clone().unwrap(), sys_label_subchunks[4], sys_num_subchunks[4]);
+    render_label_value(
+        f,
+        "Hostname: ",
+        stats.host_name.clone().unwrap(),
+        sys_label_subchunks[0],
+        sys_num_subchunks[0],
+    );
+    render_label_value(
+        f,
+        "Version: ",
+        stats.os_version.clone().unwrap(),
+        sys_label_subchunks[1],
+        sys_num_subchunks[1],
+    );
+    render_label_value(
+        f,
+        "Uptime: ",
+        stats.uptime.to_string(),
+        sys_label_subchunks[2],
+        sys_num_subchunks[2],
+    );
+    render_label_value(
+        f,
+        "CPU_Arch: ",
+        stats.arch.to_string(),
+        sys_label_subchunks[3],
+        sys_num_subchunks[3],
+    );
+    render_label_value(
+        f,
+        "OS: ",
+        stats.os_name.clone().unwrap(),
+        sys_label_subchunks[4],
+        sys_num_subchunks[4],
+    );
 }

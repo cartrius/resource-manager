@@ -1,24 +1,20 @@
 use sysinfo::System;
-mod system;
 mod processes;
-mod ui; 
-use std::{
-    io::{self, Result},
-    time::Duration,
-};
+mod system;
+mod ui;
+use crate::processes::collect_processes;
+use crate::system::{collect_disks_stats, collect_system_stats};
+use crate::ui::draw_ui;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use tui::{
-    backend::CrosstermBackend,
-    Terminal,
+use std::{
+    io::{self, Result},
+    time::Duration,
 };
-use crate::ui::draw_ui;
-use crate::system::{collect_system_stats, collect_disks_stats};
-use crate::processes::collect_processes;
-
+use tui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> Result<()> {
     // Setup terminal in raw mode

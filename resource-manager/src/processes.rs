@@ -1,4 +1,4 @@
-use sysinfo::{Pid, Uid, Gid, System};
+use sysinfo::{Gid, Pid, System, Uid};
 
 pub struct ProcessInfo {
     pub pid: Pid,
@@ -25,4 +25,3 @@ pub fn collect_processes(sys: &System) -> Vec<ProcessInfo> {
     }
     process_info_vec
 }
-
