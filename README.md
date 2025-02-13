@@ -40,3 +40,15 @@ It displays CPU usage (global and per-core), memory usage, disk usage, and a liv
 1. **Install Rust** if you haven’t already:  
    ```bash
    curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh
+   ```
+
+2. **Clone this repo**
+   ```bash
+   git clone https://github.com/your-username/resource-manager.git
+   cd resource-manager
+   ```
+3. **Build and run**
+   ```bash
+   cargo run
+   ```
+4. **Press `q` or ESC** to exit the TUI.
