@@ -4,7 +4,7 @@ A **terminal-based resource manager** written in Rust, featuring a text-based UI
 
 It displays CPU usage (global and per-core), memory usage, disk usage, and a live list of processes. Color coding is applied to usage values for quick at-a-glance monitoring.
 
-![Resource manager TUI interface](./resource_manager.png)
+![Resource manager TUI interface](./resource_manager_tui.png)
 
 ## Features
 
